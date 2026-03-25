@@ -25,7 +25,12 @@ class VLMPlanner(BasePlanner):
 
     name = "vlm_frontier"
 
+    # Class-level reference so the 3D runner can inject the image provider
+    # after the simulator creates the planner internally.
+    _active_instance: "VLMPlanner | None" = None
+
     def __init__(self, cfg: dict) -> None:
+        VLMPlanner._active_instance = self
         vlm_cfg = cfg.get("vlm", {})
         self._goal_prompt: str = str(vlm_cfg.get("goal_prompt", "explore the map"))
         self._utility_boost: float = float(vlm_cfg.get("utility_boost", 5.0))
@@ -51,6 +56,10 @@ class VLMPlanner(BasePlanner):
         # Artifact manager (injected by simulator)
         self._artifact_mgr: ArtifactManager | None = None
 
+        # External image provider (for 3D 1st-person camera)
+        self._external_image_provider: Any = None
+        self._image_mode: str = "topdown"  # "topdown", "first_person", "both"
+
         # Cache: avoid re-querying VLM if frontiers haven't changed
         self._last_frontier_count: int = -1
         self._last_robot_target: tuple[int, int] | None = None
@@ -65,6 +74,45 @@ class VLMPlanner(BasePlanner):
 
     def set_goal_prompt(self, goal: str) -> None:
         self._goal_prompt = goal
+
+    def set_image_provider(self, provider: Any) -> None:
+        """Inject a callable() -> str that returns a base64 PNG for the VLM.
+
+        When set, this replaces the default top-down map snapshot.
+        Use ``set_image_mode("both")`` to send *both* images to the VLM.
+        """
+        self._external_image_provider = provider
+
+    def set_image_mode(self, mode: str) -> None:
+        """Set VLM image mode: 'topdown' (default), 'first_person', or 'both'."""
+        self._image_mode = mode
+
+    # ------------------------------------------------------------------
+    # Image stitching
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _stitch_images(left_b64: str, right_b64: str) -> str:
+        """Stitch two base64 PNGs side-by-side into one image."""
+        import base64
+        import io
+        from PIL import Image
+
+        left = Image.open(io.BytesIO(base64.b64decode(left_b64)))
+        right = Image.open(io.BytesIO(base64.b64decode(right_b64)))
+        # Resize to same height
+        h = max(left.height, right.height)
+        if left.height != h:
+            left = left.resize((int(left.width * h / left.height), h))
+        if right.height != h:
+            right = right.resize((int(right.width * h / right.height), h))
+        combined = Image.new("RGB", (left.width + right.width, h))
+        combined.paste(left, (0, 0))
+        combined.paste(right, (left.width, 0))
+        buf = io.BytesIO()
+        combined.save(buf, format="PNG")
+        buf.seek(0)
+        return base64.b64encode(buf.read()).decode("ascii")
 
     # ------------------------------------------------------------------
     # Cache invalidation
@@ -104,12 +152,28 @@ class VLMPlanner(BasePlanner):
                     goal_prompt=self._goal_prompt,
                     artifact_mgr=self._artifact_mgr,
                 )
-                image_b64 = render_snapshot_png_b64(
+                # Build image(s) based on mode
+                topdown_b64 = render_snapshot_png_b64(
                     map_mgr=planner_input.shared_map,
                     robots=planner_input.robot_states,
                     frontier_candidates=candidates,
                     artifact_mgr=self._artifact_mgr,
                 )
+                fp_b64 = None
+                if self._external_image_provider is not None:
+                    try:
+                        fp_b64 = self._external_image_provider()
+                    except Exception as img_err:
+                        print(f"[VLM] 1st-person image capture failed: {img_err}")
+
+                if self._image_mode == "first_person" and fp_b64:
+                    image_b64 = fp_b64
+                elif self._image_mode == "both" and fp_b64:
+                    # Stitch side-by-side: 1st person left, top-down right
+                    image_b64 = self._stitch_images(fp_b64, topdown_b64)
+                else:
+                    image_b64 = topdown_b64
+
                 vlm_response = self._vlm.query(
                     goal_prompt=self._goal_prompt,
                     map_state=map_state,

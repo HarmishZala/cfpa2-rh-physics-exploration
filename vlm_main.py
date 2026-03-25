@@ -9,6 +9,11 @@ from __future__ import annotations
 import os
 import sys
 
+# Load .env file (API keys etc.) — search current dir and parents
+from dotenv import load_dotenv
+load_dotenv()
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "..", ".env"))
+
 # Must be set BEFORE any matplotlib import so the interactive backend is used
 # for the live visualisation window.
 if os.environ.get("MPLBACKEND") is None:
