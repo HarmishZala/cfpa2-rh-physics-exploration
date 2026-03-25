@@ -32,7 +32,7 @@ def compute_candidate_utilities(
         rep = c.representative
         if not _allowed_by_reservation(rep, robot.robot_id, reservation_state):
             continue
-        ev = evaluate_candidate(robot, rep, map_mgr, cfg, neighborhood=neighborhood)
+        ev = evaluate_candidate(robot, rep, map_mgr, cfg, neighborhood=neighborhood, candidate=c, all_candidates=candidates)
         if ev is None:
             continue
         out[rep] = ev

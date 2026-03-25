@@ -1,6 +1,0 @@
-environment:
-  map_width: 81
-  map_height: 81
-  map_type: maze
-  random_seed: 42
-  obstacle_density: 0.0

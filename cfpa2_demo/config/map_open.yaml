@@ -1,6 +1,0 @@
-environment:
-  map_width: 80
-  map_height: 80
-  map_type: open
-  random_seed: 42
-  obstacle_density: 0.04

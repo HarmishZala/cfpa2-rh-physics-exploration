@@ -11,33 +11,28 @@ if str(ROOT) not in sys.path:
 from experiments.compare_planners_across_maps import main as compare_planners_main
 
 ENV_CFG = {
-    "maze": "configs/env_maze.yaml",
-    "narrow_t_branches": "configs/env_narrow_t_branches.yaml",
-    "narrow_t_dense_branches": "configs/env_narrow_t_dense_branches.yaml",
-    "narrow_t_asymmetric_branches": "configs/env_narrow_t_asymmetric_branches.yaml",
-    "narrow_t_loop_branches": "configs/env_narrow_t_loop_branches.yaml",
+    "narrow_t_branches": "configs/env_narrow_t_branches_single_robot.yaml",
+    "narrow_t_dense_branches": "configs/env_narrow_t_dense_branches_single_robot.yaml",
 }
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Unified planner comparison wrapper")
-    parser.add_argument("--base-config", type=str, default="configs/base.yaml")
+    parser = argparse.ArgumentParser(description="Single-robot planner comparison wrapper")
+    parser.add_argument("--base-config", type=str, default="configs/base_single_robot.yaml")
     parser.add_argument(
         "--planners",
         nargs="+",
-        default=["cfpa2", "active_slam_explorer", "macro_frontier_explorer", "rh_cfpa2", "physics_rh_cfpa2", "hybrid_explorer"],
-        choices=["cfpa2", "active_slam_explorer", "macro_frontier_explorer", "rh_cfpa2", "physics_rh_cfpa2", "hybrid_explorer"],
+        default=["single_robot_frontier", "cfpa2", "rh_cfpa2", "hybrid_explorer"],
+        choices=["cfpa2", "active_slam_explorer", "macro_frontier_explorer", "rh_cfpa2", "physics_rh_cfpa2", "hybrid_explorer", "single_robot_frontier"],
     )
     parser.add_argument(
         "--envs",
         nargs="+",
-        default=["maze", "narrow_t_branches", "narrow_t_asymmetric_branches", "narrow_t_loop_branches"],
-        choices=["maze", "narrow_t_branches", "narrow_t_dense_branches", "narrow_t_asymmetric_branches", "narrow_t_loop_branches"],
-        help="Named env presets; ignored when --env-configs is provided.",
+        default=["narrow_t_branches", "narrow_t_dense_branches"],
+        choices=["narrow_t_branches", "narrow_t_dense_branches"],
     )
-    parser.add_argument("--env-configs", nargs="+", default=None, help="Direct env config paths")
     parser.add_argument("--seed-start", type=int, default=0)
-    parser.add_argument("--num-seeds", type=int, default=2)
+    parser.add_argument("--num-seeds", type=int, default=3)
     parser.add_argument("--max-steps", type=int, default=None)
     parser.add_argument("--run-id", type=str, default=None)
     parser.add_argument("--output-root", type=str, default="outputs")
@@ -48,8 +43,7 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
-
-    env_cfgs = list(args.env_configs) if args.env_configs else [ENV_CFG[e] for e in args.envs]
+    env_cfgs = [ENV_CFG[e] for e in args.envs]
 
     forwarded_argv = [
         "compare_planners_across_maps.py",

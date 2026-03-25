@@ -510,6 +510,74 @@ def generate_interaction_cross(width: int, height: int, obstacle_density: float,
     return grid
 
 
+def find_dead_end_cells(
+    grid: np.ndarray,
+    count: int,
+    rng: np.random.Generator,
+    exclusion_zone: set[tuple[int, int]] | None = None,
+    min_distance_from_edge: int = 2,
+) -> list[tuple[int, int]]:
+    """Return up to `count` free cells that are corridor dead-ends (exactly 1 free neighbour).
+
+    Dead-ends are semantically interesting artifact locations — they sit at the tip
+    of a branch and force the robot to explore the full corridor to find them.
+    """
+    exclusion_zone = exclusion_zone or set()
+    dead_ends: list[tuple[int, int]] = []
+    h, w = grid.shape
+    for y in range(min_distance_from_edge, h - min_distance_from_edge):
+        for x in range(min_distance_from_edge, w - min_distance_from_edge):
+            if grid[y, x] != FREE:
+                continue
+            if (x, y) in exclusion_zone:
+                continue
+            free_neighbours = sum(
+                1
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))
+                if 0 <= y + dy < h and 0 <= x + dx < w and grid[y + dy, x + dx] == FREE
+            )
+            if free_neighbours == 1:
+                dead_ends.append((x, y))
+
+    if not dead_ends:
+        # Fallback: sample any free interior cell if no dead-ends found
+        free_cells = [
+            (x, y)
+            for y in range(min_distance_from_edge, h - min_distance_from_edge)
+            for x in range(min_distance_from_edge, w - min_distance_from_edge)
+            if grid[y, x] == FREE and (x, y) not in exclusion_zone
+        ]
+        dead_ends = free_cells
+
+    indices = rng.permutation(len(dead_ends)).tolist()
+    return [dead_ends[i] for i in indices[:count]]
+
+
+def generate_map_with_artifacts(
+    map_type: str,
+    width: int,
+    height: int,
+    obstacle_density: float,
+    seed: int,
+    artifact_count: int = 1,
+    exclusion_zone: set[tuple[int, int]] | None = None,
+) -> tuple[np.ndarray, list[tuple[int, int]]]:
+    """Generate a map and choose artifact positions at corridor dead-ends.
+
+    Returns
+    -------
+    (grid, artifact_positions)
+        grid              : occupancy grid (same as generate_map)
+        artifact_positions: list of (x, y) cells where artifacts are placed
+    """
+    grid = generate_map(map_type, width, height, obstacle_density, seed)
+    rng = np.random.default_rng(seed + 99991)
+    artifact_positions = find_dead_end_cells(
+        grid, artifact_count, rng, exclusion_zone=exclusion_zone
+    )
+    return grid, artifact_positions
+
+
 def generate_map(map_type: str, width: int, height: int, obstacle_density: float, seed: int) -> np.ndarray:
     if map_type == "corridor_maze":
         return generate_corridor_maze(width, height, obstacle_density, seed)

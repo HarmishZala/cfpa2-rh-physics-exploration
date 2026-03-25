@@ -19,6 +19,7 @@ from core.types import GoalAssignment, PlannerInput, RobotState
 from planners import build_planner
 from simulators.base_simulator import BaseSimulator
 
+from core.artifact_manager import ArtifactManager
 from .map_generators import generate_map
 
 
@@ -255,19 +256,29 @@ class GridSimulation(BaseSimulator):
         env_cfg = dict(cfg["environment"])
         env_cfg["random_seed"] = int(seed)
 
-        truth = generate_map(
-            map_type=str(env_cfg["map_type"]),
-            width=int(env_cfg["map_width"]),
-            height=int(env_cfg["map_height"]),
-            obstacle_density=float(env_cfg.get("obstacle_density", 0.0)),
-            seed=int(env_cfg["random_seed"]),
-        )
+        prebuilt = cfg.get("_prebuilt_truth_map")
+        if prebuilt is not None:
+            truth = prebuilt
+        else:
+            truth = generate_map(
+                map_type=str(env_cfg["map_type"]),
+                width=int(env_cfg["map_width"]),
+                height=int(env_cfg["map_height"]),
+                obstacle_density=float(env_cfg.get("obstacle_density", 0.0)),
+                seed=int(env_cfg["random_seed"]),
+            )
 
         map_mgr = MapManager(truth)
         robots = _build_robots(cfg, map_mgr)
         cfg = dict(cfg)
         cfg["planning"] = dict(cfg["planning"])
         cfg["planning"]["planner_name"] = planner_name
+
+        # Artifact system (only active when vlm.enabled)
+        artifact_mgr: ArtifactManager | None = None
+        if cfg.get("vlm", {}).get("enabled", False):
+            positions = cfg["vlm"].get("_artifact_positions", [])
+            artifact_mgr = ArtifactManager(positions)
 
         rng = np.random.default_rng(int(seed))
 
@@ -280,6 +291,8 @@ class GridSimulation(BaseSimulator):
             map_mgr.observe_from(r.pose, r.heading_deg, sensor_range, sensor_fov, use_los, miss_prob, rng)
 
         planner = build_planner(cfg)
+        if hasattr(planner, "set_artifact_manager") and artifact_mgr is not None:
+            planner.set_artifact_manager(artifact_mgr)
         metrics = EpisodeMetrics(
             planner_name=planner_name,
             map_name=str(env_cfg.get("map_name", env_cfg["map_type"])),
@@ -501,8 +514,20 @@ class GridSimulation(BaseSimulator):
                 if congested:
                     metrics.log_congestion()
 
+            newly_observed: set[tuple[int, int]] = set()
             for r in robots:
-                map_mgr.observe_from(r.pose, r.heading_deg, sensor_range, sensor_fov, use_los, miss_prob, rng)
+                observed = map_mgr.observe_from(r.pose, r.heading_deg, sensor_range, sensor_fov, use_los, miss_prob, rng)
+                newly_observed.update(observed)
+
+            # Artifact discovery check
+            if artifact_mgr is not None:
+                newly_found = artifact_mgr.check_discovery(newly_observed)
+                for pos in newly_found:
+                    print(f"[FOUND] Artifact at (x={pos[0]}, y={pos[1]}) — step {step_idx}")
+                if artifact_mgr.all_found:
+                    success = True
+                    reason = "artifact_found"
+                    break
 
             metrics.update_prediction_error(step_idx, robots)
 
@@ -537,6 +562,8 @@ class GridSimulation(BaseSimulator):
                 last_replan_reason=last_replan_reason,
                 sensor_range=sensor_range,
                 sensor_fov_deg=sensor_fov,
+                artifact_positions=artifact_mgr.positions if artifact_mgr else None,
+                found_positions=set(artifact_mgr.found_positions) if artifact_mgr else None,
             )
 
             prev_frontier_count = len(frontier_candidates)

@@ -34,6 +34,13 @@ def _cfg(planner_name: str) -> dict:
             "reassign_on_reach": True,
             "reservation_ttl": 8,
             "hysteresis_margin": 0.0,
+            "frontier_policy": {"type": "frontiernet_proxy"},
+            "local_planner": {
+                "type": "cost_aware_astar",
+                "obstacle_cost_radius": 1,
+                "obstacle_cost_weight": 0.1,
+                "turn_cost_weight": 0.05,
+            },
             "weights": {"w_ig": 1.0, "w_cost": 0.4, "w_switch": 0.2, "w_turn": 0.0},
             "penalties": {"lambda_overlap": 0.5, "sigma_overlap": 8.0, "mu_interference": 0.1, "interference_distance": 2.5},
             "rollout": {
@@ -108,6 +115,22 @@ def test_cfpa2_planner_runs() -> None:
     assert out.planner_name == "cfpa2"
 
 
+def test_active_slam_explorer_planner_runs() -> None:
+    planner_input = _planner_input("active_slam_explorer")
+    planner = build_planner(planner_input.config)
+    out = planner.plan(planner_input)
+    assert out.assignments
+    assert out.planner_name == "active_slam_explorer"
+
+
+def test_macro_frontier_explorer_planner_runs() -> None:
+    planner_input = _planner_input("macro_frontier_explorer")
+    planner = build_planner(planner_input.config)
+    out = planner.plan(planner_input)
+    assert out.assignments
+    assert out.planner_name == "macro_frontier_explorer"
+
+
 def test_rh_cfpa2_planner_runs() -> None:
     planner_input = _planner_input("rh_cfpa2")
     planner = build_planner(planner_input.config)
@@ -123,3 +146,12 @@ def test_physics_rh_cfpa2_planner_runs() -> None:
     out = planner.plan(planner_input)
     assert out.assignments
     assert out.planner_name == "rh_cfpa2" or out.planner_name == "physics_rh_cfpa2"
+
+
+def test_hybrid_explorer_planner_runs() -> None:
+    planner_input = _planner_input("hybrid_explorer")
+    planner = build_planner(planner_input.config)
+    out = planner.plan(planner_input)
+    assert out.assignments
+    assert out.planner_name == "hybrid_explorer"
+    assert "predictor" in out.debug

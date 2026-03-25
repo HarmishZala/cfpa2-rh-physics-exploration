@@ -39,6 +39,7 @@ class EpisodeMetrics:
     failure_reason: str = ""
     completion_steps: int = 0
     completion_time: float = 0.0
+    artifact_found_step: int | None = None
 
     step_logs: list[dict[str, Any]] = field(default_factory=list)
 
@@ -184,6 +185,8 @@ class EpisodeMetrics:
         self.completion_time = float(sim_time)
         self.success = bool(success)
         self.failure_reason = reason
+        if reason == "artifact_found":
+            self.artifact_found_step = int(steps)
 
         total_move = int(sum(r.total_move_steps for r in robots))
         revisited = int(sum(r.revisited_move_steps for r in robots))
@@ -264,6 +267,7 @@ class EpisodeMetrics:
             "predictor_type": self.predictor_type,
             "avg_frontier_candidates": avg_frontier_candidates,
             "failure_reason": self.failure_reason,
+            "artifact_found_step": self.artifact_found_step,
             "prediction_error_by_horizon": json.dumps(prediction_error, sort_keys=True),
             "prediction_error_h1": float(prediction_error.get(1, 0.0)),
             "prediction_error_h3": float(prediction_error.get(3, 0.0)),

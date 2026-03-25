@@ -10,8 +10,12 @@ from simulators.grid_sim import GridSimulation
 
 PLANNER_CFG = {
     "cfpa2": "configs/planner_cfpa2.yaml",
+    "active_slam_explorer": "configs/planner_active_slam_explorer.yaml",
+    "macro_frontier_explorer": "configs/planner_macro_frontier_explorer.yaml",
     "rh_cfpa2": "configs/planner_rh_cfpa2.yaml",
     "physics_rh_cfpa2": "configs/planner_physics_rh_cfpa2.yaml",
+    "hybrid_explorer": "configs/planner_hybrid_explorer.yaml",
+    "single_robot_frontier": "configs/planner_single_robot_frontier.yaml",
 }
 
 ENV_CFG = {
@@ -26,7 +30,12 @@ ENV_CFG = {
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Unified multi-robot exploration entrypoint")
     parser.add_argument("--base-config", type=str, default="configs/base.yaml")
-    parser.add_argument("--planner", type=str, default="cfpa2", choices=["cfpa2", "rh_cfpa2", "physics_rh_cfpa2"])
+    parser.add_argument(
+        "--planner",
+        type=str,
+        default="cfpa2",
+        choices=["cfpa2", "active_slam_explorer", "macro_frontier_explorer", "rh_cfpa2", "physics_rh_cfpa2", "hybrid_explorer", "single_robot_frontier"],
+    )
     parser.add_argument("--planner-config", type=str, default=None)
     parser.add_argument(
         "--env",

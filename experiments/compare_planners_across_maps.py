@@ -17,8 +17,12 @@ from simulators.grid_sim import GridSimulation
 
 PLANNER_CFG = {
     "cfpa2": "configs/planner_cfpa2.yaml",
+    "active_slam_explorer": "configs/planner_active_slam_explorer.yaml",
+    "macro_frontier_explorer": "configs/planner_macro_frontier_explorer.yaml",
     "rh_cfpa2": "configs/planner_rh_cfpa2.yaml",
     "physics_rh_cfpa2": "configs/planner_physics_rh_cfpa2.yaml",
+    "hybrid_explorer": "configs/planner_hybrid_explorer.yaml",
+    "single_robot_frontier": "configs/planner_single_robot_frontier.yaml",
 }
 
 
@@ -28,8 +32,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--planners",
         nargs="+",
-        default=["cfpa2", "rh_cfpa2", "physics_rh_cfpa2"],
-        choices=["cfpa2", "rh_cfpa2", "physics_rh_cfpa2"],
+        default=["cfpa2", "active_slam_explorer", "macro_frontier_explorer", "rh_cfpa2", "physics_rh_cfpa2", "hybrid_explorer", "single_robot_frontier"],
+        choices=["cfpa2", "active_slam_explorer", "macro_frontier_explorer", "rh_cfpa2", "physics_rh_cfpa2", "hybrid_explorer", "single_robot_frontier"],
     )
     parser.add_argument(
         "--env-configs",
@@ -59,9 +63,9 @@ def _plot_summary(df: pd.DataFrame, out_dir: Path) -> None:
 
     for map_name, sub in df.groupby("map_name"):
         plt.figure(figsize=(8.0, 4.5))
-        order = ["cfpa2", "rh_cfpa2", "physics_rh_cfpa2"]
+        order = ["cfpa2", "rh_cfpa2", "physics_rh_cfpa2", "hybrid_explorer", "single_robot_frontier", "active_slam_explorer", "macro_frontier_explorer"]
         sub = sub.set_index("planner_name").reindex(order).dropna(how="all").reset_index()
-        plt.bar(sub["planner_name"], sub["completion_steps"], color=["#6D4C41", "#1976D2", "#2E7D32"][: len(sub)])
+        plt.bar(sub["planner_name"], sub["completion_steps"], color=plt.cm.tab10.colors[: len(sub)])
         plt.title(f"Mean Completion Steps | {map_name}")
         plt.ylabel("steps")
         plt.grid(axis="y", alpha=0.3)
@@ -70,7 +74,7 @@ def _plot_summary(df: pd.DataFrame, out_dir: Path) -> None:
         plt.close()
 
         plt.figure(figsize=(8.0, 4.5))
-        plt.bar(sub["planner_name"], sub["final_coverage"], color=["#8D6E63", "#42A5F5", "#66BB6A"][: len(sub)])
+        plt.bar(sub["planner_name"], sub["final_coverage"], color=plt.cm.tab10.colors[: len(sub)])
         plt.title(f"Final Coverage | {map_name}")
         plt.ylim(0.0, 1.01)
         plt.grid(axis="y", alpha=0.3)
@@ -155,7 +159,7 @@ def _plot_metrics_tables(summary_df: pd.DataFrame, out_dir: Path) -> None:
     if summary_df.empty:
         return
 
-    order = ["cfpa2", "rh_cfpa2", "physics_rh_cfpa2"]
+    order = ["cfpa2", "rh_cfpa2", "physics_rh_cfpa2", "hybrid_explorer", "single_robot_frontier", "active_slam_explorer", "macro_frontier_explorer"]
     for map_name, sub in summary_df.groupby("map_name"):
         sub = sub.set_index("planner_name").reindex(order).dropna(how="all").reset_index()
         table_df = _format_table_frame(sub)

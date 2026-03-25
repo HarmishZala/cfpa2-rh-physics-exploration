@@ -84,6 +84,9 @@ class AnimationRenderer:
         last_replan_reason: str,
         sensor_range: int,
         sensor_fov_deg: float,
+        artifact_positions: list[tuple[int, int]] | None = None,
+        found_positions: set[tuple[int, int]] | None = None,
+        vlm_reasoning: str | None = None,
     ) -> None:
         if not self.should_draw(step_idx):
             return
@@ -101,6 +104,16 @@ class AnimationRenderer:
             rx = [c[0] for c in reps]
             ry = [c[1] for c in reps]
             self.ax.scatter(rx, ry, c=FRONTIER_COLOR, s=45, marker="x", linewidths=1.5)
+
+        # --- Artifact overlay (operator view) ---
+        if artifact_positions:
+            _found = found_positions or set()
+            for ax_, ay_ in artifact_positions:
+                color = "#FF4500" if (ax_, ay_) in _found else "#FFD700"
+                self.ax.scatter(
+                    [ax_], [ay_], c=color, s=200, marker="*",
+                    edgecolors="black", linewidths=0.5, zorder=6,
+                )
 
         for robot in robots:
             rid = robot.robot_id
@@ -156,6 +169,12 @@ class AnimationRenderer:
             f"joint_score={score_txt}\n"
             f"last_replan={last_replan_reason}"
         )
+        if vlm_reasoning:
+            short = vlm_reasoning[:80] + ("..." if len(vlm_reasoning) > 80 else "")
+            info += f"\nvlm: {short}"
+        if artifact_positions:
+            n_found = len(found_positions or set())
+            info += f"\nartifacts: {n_found}/{len(artifact_positions)}"
         self.ax.text(
             1.01,
             0.99,
@@ -181,7 +200,7 @@ class AnimationRenderer:
             self.frames.append(frame)
 
         if self.enable_live:
-            plt.pause(0.001)
+            plt.pause(0.01)  # 10ms — enough for macOS to refresh the window
 
     def finalize(self, output_stem: str | Path) -> tuple[str | None, str | None]:
         gif_path: str | None = None

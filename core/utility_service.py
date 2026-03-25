@@ -5,8 +5,9 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .frontier_value_model import contextual_frontier_bonus
 from .map_manager import OCCUPIED, UNKNOWN, MapManager
-from .path_service import astar_path, heading_delta_cost, path_cost
+from .path_service import heading_delta_cost, path_cost, plan_path
 from .types import Cell, RobotState
 
 
@@ -42,24 +43,30 @@ def evaluate_candidate(
     cfg: dict,
     neighborhood: int = 8,
     known_grid: np.ndarray | None = None,
+    candidate=None,
+    all_candidates: list | None = None,
 ) -> CandidateEvaluation | None:
     weights = cfg["planning"]["weights"]
     clearance = int(cfg["robots"].get("clearance_cells", 0))
 
     ig = information_gain(map_mgr, frontier, radius=int(cfg["frontier"]["ig_radius"]), known_grid=known_grid)
-    path = astar_path(map_mgr, robot.pose, frontier, neighborhood=neighborhood, clearance_cells=clearance)
+    path = plan_path(map_mgr, robot.pose, frontier, cfg=cfg, neighborhood=neighborhood, clearance_cells=clearance)
     if path is None:
         return None
 
     travel = path_cost(path)
     sw = switch_penalty(robot, frontier)
     turn = heading_delta_cost(robot.heading_deg, path)
+    context_bonus = 0.0
+    if candidate is not None and all_candidates is not None:
+        context_bonus, _ = contextual_frontier_bonus(robot, candidate, all_candidates, map_mgr, cfg)
 
     score = (
         float(weights.get("w_ig", 1.0)) * ig
         - float(weights.get("w_cost", 1.0)) * travel
         - float(weights.get("w_switch", 0.0)) * sw
         - float(weights.get("w_turn", 0.0)) * turn
+        + float(context_bonus)
     )
 
     return CandidateEvaluation(

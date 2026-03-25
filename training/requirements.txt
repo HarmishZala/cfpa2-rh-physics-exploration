@@ -1,2 +1,0 @@
-# Optional dependencies for large-scale physics residual training pipeline
-torch>=2.2

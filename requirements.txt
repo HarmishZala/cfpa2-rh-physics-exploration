@@ -1,1 +1,8 @@
--r cfpa2_demo/requirements.txt
+numpy
+pandas
+matplotlib
+pyyaml
+pillow
+imageio
+imageio[ffmpeg]
+groq
