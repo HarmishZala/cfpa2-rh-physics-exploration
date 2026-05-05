@@ -6,3 +6,6 @@ pillow
 imageio
 imageio[ffmpeg]
 groq
+opencv-python>=4.8
+ultralytics>=8.1
+python-dotenv
